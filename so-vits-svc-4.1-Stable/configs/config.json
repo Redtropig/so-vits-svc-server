@@ -1,0 +1,105 @@
+{
+  "data": {
+    "sampling_rate": 44100,
+    "training_files": "filelists/train.txt",
+    "mel_fmax": 22050,
+    "n_mel_channels": 80,
+    "filter_length": 2048,
+    "max_wav_value": 32768,
+    "mel_fmin": 0,
+    "win_length": 2048,
+    "unit_interpolate_mode": "nearest",
+    "validation_files": "filelists/val.txt",
+    "hop_length": 512
+  },
+  "model": {
+    "use_spectral_norm": false,
+    "hidden_channels": 192,
+    "speech_encoder": "vec768l12",
+    "upsample_kernel_sizes": [
+      16,
+      16,
+      4,
+      4,
+      4
+    ],
+    "n_flow_layer": 4,
+    "n_layers_q": 3,
+    "use_automatic_f0_prediction": true,
+    "resblock_dilation_sizes": [
+      [
+        1,
+        3,
+        5
+      ],
+      [
+        1,
+        3,
+        5
+      ],
+      [
+        1,
+        3,
+        5
+      ]
+    ],
+    "filter_channels": 768,
+    "use_depthwise_conv": false,
+    "n_layers_trans_flow": 3,
+    "resblock": "1",
+    "ssl_dim": 768,
+    "kernel_size": 3,
+    "vol_embedding": true,
+    "flow_share_parameter": false,
+    "upsample_rates": [
+      8,
+      8,
+      2,
+      2,
+      2
+    ],
+    "inter_channels": 192,
+    "speaker_embedding": false,
+    "use_transformer_flow": false,
+    "n_heads": 2,
+    "n_speakers": 1,
+    "upsample_initial_channel": 512,
+    "p_dropout": 0.1,
+    "resblock_kernel_sizes": [
+      3,
+      7,
+      11
+    ],
+    "gin_channels": 768,
+    "vocoder_name": "nsf-hifigan",
+    "n_layers": 6
+  },
+  "train": {
+    "vol_aug": true,
+    "batch_size": 4,
+    "init_lr_ratio": 1,
+    "seed": 1234,
+    "c_mel": 45,
+    "eps": 1E-9,
+    "keep_ckpts": 1,
+    "log_interval": 50,
+    "fp16_run": false,
+    "warmup_epochs": 0,
+    "all_in_mem": true,
+    "lr_decay": 0.999875,
+    "segment_size": 10240,
+    "c_kl": 1,
+    "eval_interval": 200,
+    "port": "8001",
+    "betas": [
+      0.8,
+      0.99
+    ],
+    "half_type": "fp16",
+    "epochs": 10000,
+    "learning_rate": 0.0001,
+    "use_sr": true,
+    "max_speclen": 512
+  },
+  "spk": {"default-speaker": 0}
+}

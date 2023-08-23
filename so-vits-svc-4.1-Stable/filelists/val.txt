@@ -1,0 +1,2 @@
+./dataset/44k/default-speaker/HappyH_4_HuoLian_16.wav
+./dataset/44k/default-speaker/HappyH_4_HuoLian_24.wav
