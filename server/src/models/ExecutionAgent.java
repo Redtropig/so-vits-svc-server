@@ -2,10 +2,8 @@ package models;
 
 import server.Server;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
@@ -34,6 +32,7 @@ public class ExecutionAgent {
     private final Queue<Runnable> taskQueue;
 
     private Process currentProcess;
+    private PrintStream printStream = System.out; // default
 
     private ExecutionAgent() {
         taskQueue = new ConcurrentLinkedQueue<>();
@@ -49,6 +48,10 @@ public class ExecutionAgent {
 
     public Process getCurrentProcess() {
         return currentProcess;
+    }
+
+    public void setPrintStream(OutputStream outputStream) {
+        printStream = new PrintStream(outputStream, true, StandardCharsets.UTF_8);
     }
 
     /**
@@ -82,8 +85,8 @@ public class ExecutionAgent {
                         Server.CHARSET_DEFAULT));
                 String line;
                 while ((line = in.readLine()) != null) {
-                    System.out.println(line);
-                    System.out.flush();
+                    printStream.println(line);
+                    printStream.flush();
                 }
                 in.close();
             } catch (IOException e) {
