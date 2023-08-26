@@ -9,10 +9,10 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 
 import static models.ExecutionAgent.*;
+import static server.Server.CHARSET_DEFAULT;
 
 /**
  * Instruction Receiver
@@ -67,7 +67,7 @@ public class InstructionReceiver {
         try (ServerSocket serverSocket = new ServerSocket(InstructionReceiver.port)) {
             instructionSocket = serverSocket.accept();
             DataInputStream inputStream = new DataInputStream(instructionSocket.getInputStream());
-            PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream(), true, StandardCharsets.UTF_8);
+            PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
 
             // Read Instruction JSONString
             String instructionJSONString = inputStream.readUTF();

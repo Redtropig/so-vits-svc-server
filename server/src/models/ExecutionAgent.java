@@ -3,12 +3,13 @@ package models;
 import server.Server;
 
 import java.io.*;
-import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Consumer;
+
+import static server.Server.CHARSET_DEFAULT;
 
 /**
  * Execution Agent
@@ -51,7 +52,7 @@ public class ExecutionAgent {
     }
 
     public void setPrintStream(OutputStream outputStream) {
-        printStream = new PrintStream(outputStream, true, StandardCharsets.UTF_8);
+        printStream = new PrintStream(outputStream, true, CHARSET_DEFAULT);
     }
 
     /**
