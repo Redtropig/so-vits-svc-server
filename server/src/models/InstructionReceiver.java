@@ -10,6 +10,7 @@ import java.io.PrintStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 
 import static models.ExecutionAgent.*;
 
@@ -22,12 +23,16 @@ import static models.ExecutionAgent.*;
 public class InstructionReceiver {
     private static final int INSTRUCTION_TRANSFER_FRAGMENT_SIZE = 1024; // bytes
     private static final File SLICING_OUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\dataset_raw");
+    private static final File PREPROCESS_OUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\dataset\\44k");
+    private static final File INFERENCE_INPUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\raw");
+    private static final File TRAINING_LOG_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\logs\\44k");
     private static final String[] AUDIO_FILE_EXTENSIONS_ACCEPTED = {"wav"};
     private static final String AUDIO_FILE_EXTENSIONS_DESCRIPTION = "Wave File(s)(*.wav)";
     private static final ExecutionAgent EXECUTION_AGENT = ExecutionAgent.getExecutionAgent();
 
     private static int port;
     private static Thread workingTask;
+    private static Socket instructionSocket; // current Socket
 
     /**
      * Start the InstructionReceiver listening if it's not yet started.
@@ -40,7 +45,12 @@ public class InstructionReceiver {
             InstructionReceiver.port = port;
             workingTask = new Thread(() -> {
                 while (true) {
-                    receive();
+                    try {
+                        receive();
+                    } catch (IllegalArgumentException | JSONException ex) {
+                        System.err.println("[ERROR] Instruction Stream Received: Illegal Format.");
+                        continue;
+                    }
                 }
             }, "Instruction-Receiver");
             workingTask.start();
@@ -53,9 +63,9 @@ public class InstructionReceiver {
      * Wait for Instruction transfer connection.
      * This will BLOCK the thread until the connection established.
      */
-    private static void receive() {
+    private static void receive() throws IllegalArgumentException, JSONException {
         try (ServerSocket serverSocket = new ServerSocket(InstructionReceiver.port)) {
-            Socket instructionSocket = serverSocket.accept();
+            instructionSocket = serverSocket.accept();
             DataInputStream inputStream = new DataInputStream(instructionSocket.getInputStream());
             PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream(), true, StandardCharsets.UTF_8);
 
@@ -63,33 +73,81 @@ public class InstructionReceiver {
             String instructionJSONString = inputStream.readUTF();
 
             // InstructionType fetch
-            JSONObject instructionJSONObject;
-            InstructionType instructionType;
-            try {
-                // Parse to JSONObject
-                instructionJSONObject = new JSONObject(instructionJSONString);
-                instructionType = InstructionType.valueOf(instructionJSONObject.getString("INSTRUCTION"));
-            } catch (IllegalArgumentException | JSONException ex) {
-                System.err.println("[ERROR] Instruction Stream Received: Illegal Format.");
-                return;
-            }
+            JSONObject instructionJSONObject = new JSONObject(instructionJSONString);
+            InstructionType instructionType = InstructionType.valueOf(instructionJSONObject.getString("INSTRUCTION"));
 
-            System.out.println("[INFO] " + instructionType +
+            System.out.println("[SERVER] " + instructionType +
                     " Instruction from: " + instructionSocket.getInetAddress() + ':' + instructionSocket.getPort());
 
+            // Parse Instruction
             switch (instructionType) {
-                case CLEAR -> {
 
+                case CLEAR -> {
+                    // determine which directory to be cleared
+                    String dirToClear = instructionJSONObject.getString("dir");
+                    switch (InstructionType.valueOf(dirToClear.toUpperCase())) {
+                        case SLICE -> {
+                            outputStream.println("[SERVER] Clearing Slice Output Folder...");
+                            removeSubDirectories(SLICING_OUT_DIR_DEFAULT);
+                        }
+                        case PREPROCESS -> {
+                            outputStream.println("[SERVER] Clearing Preprocess Output Folder...");
+                            removeSubDirectories(PREPROCESS_OUT_DIR_DEFAULT);
+                        }
+                        case TRAIN -> {
+                            outputStream.println("[SERVER] Clearing Train Log Folder...");
+                            /* Clear Train Log */
+                            for (File subFile : Objects.requireNonNull(TRAINING_LOG_DIR_DEFAULT.listFiles((f) ->
+                                    !(f.getName().equals("diffusion") ||
+                                            f.getName().equals("D_0.pth") ||
+                                            f.getName().equals("G_0.pth"))))) {
+                                if (subFile.isDirectory()) {
+                                    removeDirectory(subFile);
+                                } else {
+                                    // schedule a file deletion
+                                    String[] command = {"cmd.exe", "/c"};
+                                    EXECUTION_AGENT.executeLater(
+                                            command,
+                                            null,
+                                            (process) -> {
+                                                subFile.delete();
+                                                System.out.println("[SERVER] File Removed: \"" + subFile.getPath() + "\"");
+                                                outputStream.println("[SERVER] File Removed: \"" + subFile.getName() + "\"");
+                                            });
+                                }
+                            }
+                            // End Instruction Execution
+                            String[] command = {"cmd.exe", "/c"};
+                            EXECUTION_AGENT.executeLater(
+                                    command,
+                                    null,
+                                    (process) -> {
+                                        try {
+                                            outputStream.println("[SERVER] Deletion Complete.");
+                                            instructionSocket.close();
+                                        } catch (IOException e) {
+                                            throw new RuntimeException(e);
+                                        }
+                                    });
+
+                            // execute ASAP
+                            EXECUTION_AGENT.invokeExecution();
+                            /* End Clear Train Log */
+                        }
+                        default -> {
+                            throw new IllegalArgumentException("dirToClear is Invalid");
+                        }
+                    }
                 }
                 case SLICE -> {
-                    outputStream.println("[INFO] Slicing Audio(s)...");
+                    outputStream.println("[SERVER] Slicing Audio(s)...");
                     File[] voiceAudioFiles = FileReceiver.FOLDER_TO_SLICE.listFiles();
                     // slice each voice file
                     assert voiceAudioFiles != null;
                     for (int i = voiceAudioFiles.length - 1; i >= 0; i--) {
                         File voiceFile = voiceAudioFiles[i];
 
-                        // Command construction
+                        // command construction
                         String[] command = {
                                 PYTHON_EXE.getAbsolutePath(),
                                 SLICER_PY.getAbsolutePath(),
@@ -107,7 +165,7 @@ public class InstructionReceiver {
                                 null,
                                 (process) -> {
                                     if (process.exitValue() == 0) {
-                                        outputStream.println("[INFO] Slicing completed: " + voiceFile.getName());
+                                        outputStream.println("[SERVER] Slicing completed: " + voiceFile.getName());
                                     } else {
                                         outputStream.println("[ERROR] \"" +
                                                 SLICER_PY.getName() +
@@ -119,9 +177,9 @@ public class InstructionReceiver {
                                     voiceFile.delete();
 
                                     if (finalI == 0) {
-                                        outputStream.println("[INFO] All Slicing Done.");
+                                        outputStream.println("[SERVER] All Slicing Done.");
 
-                                        // enable related interactions after batch execution
+                                        // discard this Socket
                                         try {
                                             instructionSocket.close();
                                         } catch (IOException e) {
@@ -154,4 +212,67 @@ public class InstructionReceiver {
             return;
         }
     }
+
+    /**
+     * Remove a directory.
+     *
+     * @param directory directory to be removed
+     * @dependency Windows OS
+     */
+    private static void removeDirectory(File directory) throws IOException {
+        PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream());
+        if (directory.isDirectory()) {
+            String[] command = {"cmd.exe", "/c", "rmdir", "/s", "/q", directory.getAbsolutePath()};
+
+            // schedule a task
+            EXECUTION_AGENT.executeLater(
+                    command,
+                    null,
+                    (process) -> {
+                        if (process.exitValue() == 0) {
+                            System.out.println("[SERVER] Directory Removed: \"" + directory.getPath() + "\"");
+                            outputStream.println("[SERVER] Directory Removed: \"" + directory.getName() + "\"");
+                        } else {
+                            outputStream.println("[ERROR] \"" +
+                                    command[0] +
+                                    "\" terminated unexpectedly, exit code: " +
+                                    process.exitValue()
+                            );
+                        }
+                    });
+
+            // execute ASAP
+            EXECUTION_AGENT.invokeExecution();
+        }
+    }
+
+    /**
+     * Remove all Sub Directories of the given directory.
+     *
+     * @param directory the parent directory of directories to be removed
+     * @dependency Windows OS
+     */
+    private static void removeSubDirectories(File directory) throws IOException {
+        for (File subDir : Objects.requireNonNull(directory.listFiles(File::isDirectory))) {
+            removeDirectory(subDir);
+        }
+
+        // End Instruction Execution
+        String[] command = {"cmd.exe", "/c"};
+        EXECUTION_AGENT.executeLater(
+                command,
+                null,
+                (process) -> {
+                    // discard this Socket
+                    try {
+                        new PrintStream(instructionSocket.getOutputStream()).println("[SERVER] Deletion Complete.");
+                        instructionSocket.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+        // execute ASAP
+        EXECUTION_AGENT.invokeExecution();
+    }
+
 }

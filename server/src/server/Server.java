@@ -18,7 +18,7 @@ public class Server {
         int actualPort = InstructionReceiver.startInstructionReceiver(in.nextInt());
         FileReceiver.startFileReceiver();
 
-        System.out.println("[INFO] Server started listening on port:" + actualPort);
+        System.out.println("[SERVER] Server started listening on port:" + actualPort);
 
         /* Server Console Interactions */
         while (in.hasNext()) {
@@ -26,7 +26,7 @@ public class Server {
 
             switch (command) {
                 case "quit" -> {
-                    System.out.println("[INFO] Server Terminating...");
+                    System.out.println("[SERVER] Server Terminating...");
                     System.exit(0);
                 }
                 case "help" -> {

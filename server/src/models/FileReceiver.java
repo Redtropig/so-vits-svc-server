@@ -26,7 +26,12 @@ public class FileReceiver {
         if (workingTask == null || !workingTask.isAlive()) {
             workingTask = new Thread(() -> {
                 while (true) {
-                    receive();
+                    try {
+                        receive();
+                    } catch (IllegalArgumentException ex){
+                        System.err.println("[ERROR] File Data Stream Received: Illegal Format.");
+                        continue;
+                    }
                 }
             }, "File-Receiver");
             workingTask.start();
@@ -37,19 +42,13 @@ public class FileReceiver {
      * Wait for File transfer connection.
      * This will BLOCK the thread until the connection established.
      */
-    private static void receive() {
+    private static void receive() throws IllegalArgumentException {
         try (ServerSocket fileServerSocket = new ServerSocket(FILE_TRANSFER_SERVER_PORT);
              Socket fileTransferSocket = fileServerSocket.accept();
              DataInputStream inputStream = new DataInputStream(fileTransferSocket.getInputStream()))
         {
             // receive FileUsage metadata
-            FileUsage fileUsage;
-            try {
-                fileUsage = FileUsage.valueOf(inputStream.readUTF());
-            } catch(IllegalArgumentException ex){
-                System.err.println("[ERROR] File Data Stream Received: Illegal Format.");
-                return;
-            }
+            FileUsage fileUsage = FileUsage.valueOf(inputStream.readUTF());
 
             File destFile;
             // FileUsage determines where to store the file
@@ -76,7 +75,7 @@ public class FileReceiver {
             }
             fileOutStream.close();
 
-            System.out.println("[INFO] File Received: " + destFile);
+            System.out.println("[SERVER] File Received: " + destFile);
         } catch (IOException e) {
             return;
         }
