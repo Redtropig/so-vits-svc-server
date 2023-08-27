@@ -20,7 +20,7 @@ public class FileReceiver {
     private static Thread workingTask;
 
     /**
-     * Start the FileReceiver listening if it's not yet started.
+     * Start FileReceiver listening if it's not yet started.
      */
     public static void startFileReceiver() {
         if (workingTask == null || !workingTask.isAlive()) {
@@ -40,7 +40,7 @@ public class FileReceiver {
 
     /**
      * Wait for File transfer connection.
-     * This will BLOCK the thread until the connection established.
+     * This will BLOCK the thread until the connection is established.
      * @throws IllegalArgumentException File Stream data is in illegal format.
      */
     private static void receive() throws IllegalArgumentException {

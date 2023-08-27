@@ -36,7 +36,7 @@ public class InstructionReceiver {
     private static Socket instructionSocket; // current Socket
 
     /**
-     * Start the InstructionReceiver listening if it's not yet started.
+     * Start InstructionReceiver listening if it's not yet started.
      * @param port the expected port for newly started listening.
      *             Ignored if the port listening has already started.
      * @return the actual port in which the current InstructionReceiver is listening on.
@@ -62,7 +62,7 @@ public class InstructionReceiver {
 
     /**
      * Wait for Instruction transfer connection.
-     * This will BLOCK the thread until the connection established.
+     * This will BLOCK the thread until the connection is established.
      * @throws IllegalArgumentException Instruction Stream data is in illegal format.
      * @throws JSONException Instruction Stream data is in illegal format.
      */

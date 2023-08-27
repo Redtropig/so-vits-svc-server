@@ -2,6 +2,7 @@ package server;
 
 import models.ExecutionAgent;
 import models.FileReceiver;
+import models.GPUStatusSender;
 import models.InstructionReceiver;
 
 import java.nio.charset.Charset;
@@ -19,6 +20,7 @@ public class Server {
         // Stand-By Listening
         int actualPort = InstructionReceiver.startInstructionReceiver(in.nextInt());
         FileReceiver.startFileReceiver();
+        GPUStatusSender.startGPUStatusSender();
 
         System.out.println("[SERVER] Server started listening on port:" + actualPort);
 
