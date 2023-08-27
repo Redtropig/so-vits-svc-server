@@ -12,11 +12,12 @@ import java.net.Socket;
 import java.util.Objects;
 
 import static models.ExecutionAgent.*;
+import static models.FileReceiver.FOLDER_TO_SLICE;
 import static server.Server.CHARSET_DEFAULT;
 
 /**
- * Instruction Receiver
- * @responsibility Listening for Instructions.
+ * Instruction Receiver (Util Class)
+ * @responsibility Listening for Instructions, Construct corresponded Command, and Schedule Execution.
  * @feature One Instruction per Socket connection:
  * when the instruction is received, the corresponded Socket must be closed & discarded.
  */
@@ -62,6 +63,8 @@ public class InstructionReceiver {
     /**
      * Wait for Instruction transfer connection.
      * This will BLOCK the thread until the connection established.
+     * @throws IllegalArgumentException Instruction Stream data is in illegal format.
+     * @throws JSONException Instruction Stream data is in illegal format.
      */
     private static void receive() throws IllegalArgumentException, JSONException {
         try (ServerSocket serverSocket = new ServerSocket(InstructionReceiver.port)) {
@@ -88,11 +91,11 @@ public class InstructionReceiver {
                     switch (InstructionType.valueOf(dirToClear.toUpperCase())) {
                         case SLICE -> {
                             outputStream.println("[SERVER] Clearing Slice Output Folder...");
-                            removeSubDirectories(SLICING_OUT_DIR_DEFAULT);
+                            scheduleRemoveSubDirectories(SLICING_OUT_DIR_DEFAULT);
                         }
                         case PREPROCESS -> {
                             outputStream.println("[SERVER] Clearing Preprocess Output Folder...");
-                            removeSubDirectories(PREPROCESS_OUT_DIR_DEFAULT);
+                            scheduleRemoveSubDirectories(PREPROCESS_OUT_DIR_DEFAULT);
                         }
                         case TRAIN -> {
                             outputStream.println("[SERVER] Clearing Train Log Folder...");
@@ -102,7 +105,7 @@ public class InstructionReceiver {
                                             f.getName().equals("D_0.pth") ||
                                             f.getName().equals("G_0.pth"))))) {
                                 if (subFile.isDirectory()) {
-                                    removeDirectory(subFile);
+                                    scheduleRemoveDirectory(subFile);
                                 } else {
                                     // schedule a file deletion
                                     String[] command = {"cmd.exe", "/c"};
@@ -129,9 +132,6 @@ public class InstructionReceiver {
                                             throw new RuntimeException(e);
                                         }
                                     });
-
-                            // execute ASAP
-                            EXECUTION_AGENT.invokeExecution();
                             /* End Clear Train Log */
                         }
                         default -> {
@@ -141,7 +141,7 @@ public class InstructionReceiver {
                 }
                 case SLICE -> {
                     outputStream.println("[SERVER] Slicing Audio(s)...");
-                    File[] voiceAudioFiles = FileReceiver.FOLDER_TO_SLICE.listFiles();
+                    File[] voiceAudioFiles = FOLDER_TO_SLICE.listFiles();
                     // slice each voice file
                     assert voiceAudioFiles != null;
                     for (int i = voiceAudioFiles.length - 1; i >= 0; i--) {
@@ -189,9 +189,6 @@ public class InstructionReceiver {
                                 }
                         );
                     }
-
-                    // execute ASAP
-                    EXECUTION_AGENT.invokeExecution();
                 }
                 case PREPROCESS -> {
 
@@ -206,7 +203,8 @@ public class InstructionReceiver {
 
                 }
             }
-
+            // execute ASAP
+            EXECUTION_AGENT.invokeExecution();
 
         } catch (IOException e) {
             return;
@@ -214,12 +212,12 @@ public class InstructionReceiver {
     }
 
     /**
-     * Remove a directory.
+     * Schedule the removal of a directory.
      *
      * @param directory directory to be removed
      * @dependency Windows OS
      */
-    private static void removeDirectory(File directory) throws IOException {
+    private static void scheduleRemoveDirectory(File directory) throws IOException {
         PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream());
         if (directory.isDirectory()) {
             String[] command = {"cmd.exe", "/c", "rmdir", "/s", "/q", directory.getAbsolutePath()};
@@ -240,21 +238,18 @@ public class InstructionReceiver {
                             );
                         }
                     });
-
-            // execute ASAP
-            EXECUTION_AGENT.invokeExecution();
         }
     }
 
     /**
-     * Remove all Sub Directories of the given directory.
+     * Schedule the removal of all Sub Directories of the given directory.
      *
      * @param directory the parent directory of directories to be removed
      * @dependency Windows OS
      */
-    private static void removeSubDirectories(File directory) throws IOException {
+    private static void scheduleRemoveSubDirectories(File directory) throws IOException {
         for (File subDir : Objects.requireNonNull(directory.listFiles(File::isDirectory))) {
-            removeDirectory(subDir);
+            scheduleRemoveDirectory(subDir);
         }
 
         // End Instruction Execution
@@ -271,8 +266,6 @@ public class InstructionReceiver {
                         throw new RuntimeException(e);
                     }
                 });
-        // execute ASAP
-        EXECUTION_AGENT.invokeExecution();
     }
 
 }

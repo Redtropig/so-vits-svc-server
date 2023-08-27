@@ -5,7 +5,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 /**
- * File Receiver
+ * File Receiver (Util Class)
  * @responsibility Listening for File transfer.
  * @feature One File per Socket connection:
  * when the File is transferred, the corresponded Socket must be closed & discarded.
@@ -41,6 +41,7 @@ public class FileReceiver {
     /**
      * Wait for File transfer connection.
      * This will BLOCK the thread until the connection established.
+     * @throws IllegalArgumentException File Stream data is in illegal format.
      */
     private static void receive() throws IllegalArgumentException {
         try (ServerSocket fileServerSocket = new ServerSocket(FILE_TRANSFER_SERVER_PORT);

@@ -1,7 +1,5 @@
 package models;
 
-import server.Server;
-
 import java.io.*;
 import java.util.Arrays;
 import java.util.List;
@@ -43,12 +41,18 @@ public class ExecutionAgent {
      * Get the singleton ExecutionAgent instance.
      * @return the ExecutionAgent instance if present, otherwise create new.
      */
-    public static ExecutionAgent getExecutionAgent() {
+    public static synchronized ExecutionAgent getExecutionAgent() {
         return (executionAgent == null) ? (executionAgent = new ExecutionAgent()) : (executionAgent);
     }
 
-    public Process getCurrentProcess() {
-        return currentProcess;
+    /**
+     * Kill current Process & its sub Processes.
+     */
+    public void killCurrentProcess() {
+        if (currentProcess != null) {
+            currentProcess.descendants().forEach(ProcessHandle::destroy);
+            currentProcess.destroy();
+        }
     }
 
     public void setPrintStream(OutputStream outputStream) {
@@ -83,7 +87,7 @@ public class ExecutionAgent {
                 currentProcess.onExit().thenAccept(afterExecution == null ? (process)->{} : afterExecution);
                 // Redirect process output
                 BufferedReader in = new BufferedReader(new InputStreamReader(currentProcess.getInputStream(),
-                        Server.CHARSET_DEFAULT));
+                        CHARSET_DEFAULT));
                 String line;
                 while ((line = in.readLine()) != null) {
                     printStream.println(line);

@@ -1,5 +1,6 @@
 package server;
 
+import models.ExecutionAgent;
 import models.FileReceiver;
 import models.InstructionReceiver;
 
@@ -9,6 +10,7 @@ import java.util.Scanner;
 
 public class Server {
     public static final Charset CHARSET_DEFAULT = StandardCharsets.UTF_8;
+    private static final ExecutionAgent EXECUTION_AGENT = ExecutionAgent.getExecutionAgent();
 
     public Server() {
         Scanner in = new Scanner(System.in);
@@ -27,6 +29,7 @@ public class Server {
             switch (command) {
                 case "quit" -> {
                     System.out.println("[SERVER] Server Terminating...");
+                    EXECUTION_AGENT.killCurrentProcess();
                     System.exit(0);
                 }
                 case "help" -> {
