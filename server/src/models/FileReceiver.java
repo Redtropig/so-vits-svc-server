@@ -8,7 +8,8 @@ import java.net.Socket;
  * File Receiver (Util Class)
  * @responsibility Listening for File transfer.
  * @feature One File per Socket connection:
- * when the File is transferred, the corresponded Socket must be closed & discarded.
+ *          when the File is transferred, the corresponded Socket must be closed & discarded.
+ * @design UTILITY
  */
 public class FileReceiver {
 
@@ -76,7 +77,7 @@ public class FileReceiver {
             }
             fileOutStream.close();
 
-            System.out.println("[SERVER] File Received: " + destFile);
+            System.out.println("[SERVER] File Received: \"" + destFile + "\"");
         } catch (IOException e) {
             return;
         }

@@ -1,5 +1,5 @@
 package models;
 
 public enum InstructionType {
-    CLEAR, SLICE, PREPROCESS, TRAIN, INFER
+    CLEAR, SLICE, PREPROCESS, TRAIN, INFER, ABORT
 }

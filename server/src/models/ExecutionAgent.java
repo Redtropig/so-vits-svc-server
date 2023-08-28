@@ -31,7 +31,6 @@ public class ExecutionAgent {
     private final Queue<Runnable> taskQueue;
 
     private Process currentProcess;
-    private PrintStream printStream = System.out; // default
 
     private ExecutionAgent() {
         taskQueue = new ConcurrentLinkedQueue<>();
@@ -48,15 +47,11 @@ public class ExecutionAgent {
     /**
      * Kill current Process & its sub Processes.
      */
-    public void killCurrentProcess() {
+    public synchronized void killCurrentProcess() {
         if (currentProcess != null) {
             currentProcess.descendants().forEach(ProcessHandle::destroy);
             currentProcess.destroy();
         }
-    }
-
-    public void setPrintStream(OutputStream outputStream) {
-        printStream = new PrintStream(outputStream, true, CHARSET_DEFAULT);
     }
 
     /**
@@ -65,9 +60,10 @@ public class ExecutionAgent {
      * @param command NON-EMPTY command with its arguments. If EMPTY, task is not to be scheduled.
      * @param workDirectory the working directory of the task process. If NULL, use dir of the current Java process.
      * @param afterExecution to run AFTER the command execution.
+     * @param printOut the PrintStream transfers the execution output, if null -> System.out.
      * @return true -> task scheduled, false otherwise.
      */
-    public boolean executeLater(List<String> command, File workDirectory, Consumer<Process> afterExecution) {
+    public boolean executeLater(List<String> command, File workDirectory, Consumer<Process> afterExecution, PrintStream printOut) {
         if (command.isEmpty()) {
             return false;
         }
@@ -75,6 +71,9 @@ public class ExecutionAgent {
         if (workDirectory != null && !workDirectory.isDirectory()) {
             workDirectory = null;
         }
+        // set default printOut: System.out
+        printOut = (printOut != null) ? printOut : System.out;
+        PrintStream finalPrintOut = printOut;
 
         ProcessBuilder processBuilder = new ProcessBuilder(command).directory(workDirectory).redirectErrorStream(true);
 
@@ -90,8 +89,8 @@ public class ExecutionAgent {
                         CHARSET_DEFAULT));
                 String line;
                 while ((line = in.readLine()) != null) {
-                    printStream.println(line);
-                    printStream.flush();
+                    finalPrintOut.println(line);
+                    finalPrintOut.flush();
                 }
                 in.close();
             } catch (IOException e) {
@@ -106,10 +105,11 @@ public class ExecutionAgent {
      * @param command NON-EMPTY command with its arguments. If EMPTY, task is not to be scheduled.
      * @param workDirectory the working directory of the task process. If NULL, use dir of the current Java process.
      * @param afterExecution to run AFTER the command execution.
+     * @param printOut the PrintStream transfers the execution output.
      * @return true -> task scheduled, false otherwise.
      */
-    public boolean executeLater(String[] command, File workDirectory, Consumer<Process> afterExecution) {
-        return executeLater(Arrays.stream(command).toList(), workDirectory, afterExecution);
+    public boolean executeLater(String[] command, File workDirectory, Consumer<Process> afterExecution, PrintStream printOut) {
+        return executeLater(Arrays.stream(command).toList(), workDirectory, afterExecution, printOut);
     }
 
     /**

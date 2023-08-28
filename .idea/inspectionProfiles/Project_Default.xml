@@ -2,7 +2,7 @@
   <profile version="1.0">
     <option name="myName" value="Project Default" />
     <inspection_tool class="JavadocDeclaration" enabled="true" level="WARNING" enabled_by_default="true">
-      <option name="ADDITIONAL_TAGS" value="responsibility,design,feature,dependency" />
+      <option name="ADDITIONAL_TAGS" value="responsibility,design,feature,dependency,src,dest" />
     </inspection_tool>
   </profile>
 </component>

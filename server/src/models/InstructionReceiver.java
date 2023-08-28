@@ -3,12 +3,11 @@ package models;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.IOException;
-import java.io.PrintStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 import static models.ExecutionAgent.*;
@@ -19,7 +18,8 @@ import static server.Server.CHARSET_DEFAULT;
  * Instruction Receiver (Util Class)
  * @responsibility Listening for Instructions, Construct corresponded Command, and Schedule Execution.
  * @feature One Instruction per Socket connection:
- * when the instruction is received, the corresponded Socket must be closed & discarded.
+ *          when the instruction is received, the corresponded Socket must be closed & discarded.
+ * @design UTILITY
  */
 public class InstructionReceiver {
     private static final int INSTRUCTION_TRANSFER_FRAGMENT_SIZE = 1024; // bytes
@@ -33,7 +33,6 @@ public class InstructionReceiver {
 
     private static int port;
     private static Thread workingTask;
-    private static Socket instructionSocket; // current Socket
 
     /**
      * Start InstructionReceiver listening if it's not yet started.
@@ -67,10 +66,11 @@ public class InstructionReceiver {
      * @throws JSONException Instruction Stream data is in illegal format.
      */
     private static void receive() throws IllegalArgumentException, JSONException {
+        Socket instructionSocket = null;
         try (ServerSocket serverSocket = new ServerSocket(InstructionReceiver.port)) {
-            instructionSocket = serverSocket.accept();
+            Socket finalInstructionSocket = instructionSocket = serverSocket.accept(); // Typically closed in <afterExecution>
             DataInputStream inputStream = new DataInputStream(instructionSocket.getInputStream());
-            PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
+            PrintStream printOut = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
 
             // Read Instruction JSONString
             String instructionJSONString = inputStream.readUTF();
@@ -82,7 +82,7 @@ public class InstructionReceiver {
             System.out.println("[SERVER] " + instructionType +
                     " Instruction from: " + instructionSocket.getInetAddress() + ':' + instructionSocket.getPort());
 
-            // Parse Instruction
+            // Parse Instruction & Schedule Execution Tasks
             switch (instructionType) {
 
                 case CLEAR -> {
@@ -90,22 +90,22 @@ public class InstructionReceiver {
                     String dirToClear = instructionJSONObject.getString("dir");
                     switch (InstructionType.valueOf(dirToClear.toUpperCase())) {
                         case SLICE -> {
-                            outputStream.println("[SERVER] Clearing Slice Output Folder...");
-                            scheduleRemoveSubDirectories(SLICING_OUT_DIR_DEFAULT);
+                            printOut.println("[SERVER] Clearing Slice Output Folder...");
+                            scheduleRemoveSubDirectories(SLICING_OUT_DIR_DEFAULT, instructionSocket);
                         }
                         case PREPROCESS -> {
-                            outputStream.println("[SERVER] Clearing Preprocess Output Folder...");
-                            scheduleRemoveSubDirectories(PREPROCESS_OUT_DIR_DEFAULT);
+                            printOut.println("[SERVER] Clearing Preprocess Output Folder...");
+                            scheduleRemoveSubDirectories(PREPROCESS_OUT_DIR_DEFAULT, instructionSocket);
                         }
                         case TRAIN -> {
-                            outputStream.println("[SERVER] Clearing Train Log Folder...");
+                            printOut.println("[SERVER] Clearing Train Log Folder...");
                             /* Clear Train Log */
                             for (File subFile : Objects.requireNonNull(TRAINING_LOG_DIR_DEFAULT.listFiles((f) ->
                                     !(f.getName().equals("diffusion") ||
                                             f.getName().equals("D_0.pth") ||
                                             f.getName().equals("G_0.pth"))))) {
                                 if (subFile.isDirectory()) {
-                                    scheduleRemoveDirectory(subFile);
+                                    scheduleRemoveDirectory(subFile, instructionSocket);
                                 } else {
                                     // schedule a file deletion
                                     String[] command = {"cmd.exe", "/c"};
@@ -115,8 +115,10 @@ public class InstructionReceiver {
                                             (process) -> {
                                                 subFile.delete();
                                                 System.out.println("[SERVER] File Removed: \"" + subFile.getPath() + "\"");
-                                                outputStream.println("[SERVER] File Removed: \"" + subFile.getName() + "\"");
-                                            });
+                                                printOut.println("[SERVER] File Removed: \"" + subFile.getName() + "\"");
+                                            },
+                                            printOut
+                                    );
                                 }
                             }
                             // End Instruction Execution
@@ -126,21 +128,24 @@ public class InstructionReceiver {
                                     null,
                                     (process) -> {
                                         try {
-                                            outputStream.println("[SERVER] Deletion Complete.");
-                                            instructionSocket.close();
+                                            printOut.println("[SERVER] Deletion Complete.");
+                                            finalInstructionSocket.close();
                                         } catch (IOException e) {
                                             throw new RuntimeException(e);
                                         }
-                                    });
+                                    },
+                                    null
+                            );
                             /* End Clear Train Log */
                         }
                         default -> {
+                            instructionSocket.close();
                             throw new IllegalArgumentException("dirToClear is Invalid");
                         }
                     }
                 }
                 case SLICE -> {
-                    outputStream.println("[SERVER] Slicing Audio(s)...");
+                    printOut.println("[SERVER] Slicing Audio(s)...");
                     File[] voiceAudioFiles = FOLDER_TO_SLICE.listFiles();
                     // slice each voice file
                     assert voiceAudioFiles != null;
@@ -165,33 +170,49 @@ public class InstructionReceiver {
                                 null,
                                 (process) -> {
                                     if (process.exitValue() == 0) {
-                                        outputStream.println("[SERVER] Slicing completed: " + voiceFile.getName());
+                                        System.out.println("[SERVER] Audio Sliced: \"" + voiceFile + "\"");
+                                        printOut.println("[SERVER] Slicing completed: \"" + voiceFile.getName() + "\"");
                                     } else {
-                                        outputStream.println("[ERROR] \"" +
-                                                SLICER_PY.getName() +
-                                                "\" terminated unexpectedly, exit code: " +
-                                                process.exitValue()
-                                        );
+                                        String errorMessage = buildTerminationErrorMessage(process, SLICER_PY);
+                                        System.err.println(errorMessage);
+                                        printOut.println("[ERROR] Failed to Slice: \"" + voiceFile.getName() + "\"");
                                     }
                                     // delete tmp voice file
                                     voiceFile.delete();
 
                                     if (finalI == 0) {
-                                        outputStream.println("[SERVER] All Slicing Done.");
+                                        printOut.println("[SERVER] All Slicing Done.");
 
                                         // discard this Socket
                                         try {
-                                            instructionSocket.close();
+                                            finalInstructionSocket.close();
                                         } catch (IOException e) {
                                             throw new RuntimeException(e);
                                         }
                                     }
-                                }
+                                },
+                                printOut
                         );
                     }
                 }
                 case PREPROCESS -> {
+                    // dataset_raw: nothing is prepared
+                    if (Objects.requireNonNull(SLICING_OUT_DIR_DEFAULT.listFiles(File::isDirectory)).length == 0) {
+                        printOut.println("[!] Please SLICE at least 1 VOICE file.");
+                        throw new FileNotFoundException("No Folder (sliced) in: \"" + SLICING_OUT_DIR_DEFAULT + "\"");
+                    }
 
+                    printOut.println("[SERVER] Preprocessing Dataset...");
+
+                    // params retrival
+                    String encoder = instructionJSONObject.getString("encoder");
+                    String f0Predictor = instructionJSONObject.getString("f0_predictor");
+                    boolean loudnessEnbedding = instructionJSONObject.getBoolean("loudness_embedding");
+
+                    // schedules
+                    scheduleResampleAudio(instructionSocket);
+                    scheduleSplitDatasetAndGenerateConfig(encoder, loudnessEnbedding, instructionSocket);
+                    scheduleGenerateHubertAndF0(f0Predictor, instructionSocket);
                 }
                 case TRAIN -> {
 
@@ -199,57 +220,79 @@ public class InstructionReceiver {
                 case INFER -> {
 
                 }
+                case ABORT -> {
+                    EXECUTION_AGENT.killCurrentProcess();
+                }
                 default -> {
-
+                    throw new IllegalArgumentException("InstructionType(key:\"INSTRUCTION\") is not supported");
                 }
             }
             // execute ASAP
             EXECUTION_AGENT.invokeExecution();
 
         } catch (IOException e) {
+            // try to close Socket on return
+            if (instructionSocket != null) {
+                try {
+                    instructionSocket.close();
+                } catch (IOException ex) {
+                    return;
+                }
+            }
             return;
         }
     }
 
     /**
-     * Schedule the removal of a directory.
+     * Schedule: the removal of a directory.
      *
-     * @param directory directory to be removed
+     * @param directory directory to be removed.
+     * @param instructionSocket the Instruction Socket which this Schedule associated with.
      * @dependency Windows OS
      */
-    private static void scheduleRemoveDirectory(File directory) throws IOException {
-        PrintStream outputStream = new PrintStream(instructionSocket.getOutputStream());
+    private static void scheduleRemoveDirectory(File directory, Socket instructionSocket) throws IOException {
+        PrintStream printOut = new PrintStream(instructionSocket.getOutputStream());
+
         if (directory.isDirectory()) {
             String[] command = {"cmd.exe", "/c", "rmdir", "/s", "/q", directory.getAbsolutePath()};
 
-            // schedule a task
+            // schedule removal
             EXECUTION_AGENT.executeLater(
                     command,
                     null,
                     (process) -> {
                         if (process.exitValue() == 0) {
                             System.out.println("[SERVER] Directory Removed: \"" + directory.getPath() + "\"");
-                            outputStream.println("[SERVER] Directory Removed: \"" + directory.getName() + "\"");
+                            printOut.println("[SERVER] Directory Removed: \"" + directory.getName() + "\"");
                         } else {
-                            outputStream.println("[ERROR] \"" +
+                            System.err.println("[ERROR] \"" +
                                     command[0] +
                                     "\" terminated unexpectedly, exit code: " +
                                     process.exitValue()
                             );
+                            printOut.println("[ERROR] Failed to Remove Directory: \"" + directory.getName() + "\"");
                         }
-                    });
+                    },
+                    printOut
+            );
         }
     }
 
     /**
-     * Schedule the removal of all Sub Directories of the given directory.
+     * Schedule: the removal of all Sub Directories of the given directory.
      *
-     * @param directory the parent directory of directories to be removed
+     * @param directory the parent directory of directories to be removed.
+     * @param instructionSocket the Instruction Socket which this Schedule associated with.
+     * @feature Socket Terminal Operation:
+     *          close instructionSocket on exit of the execution.
      * @dependency Windows OS
      */
-    private static void scheduleRemoveSubDirectories(File directory) throws IOException {
+    private static void scheduleRemoveSubDirectories(File directory, Socket instructionSocket) throws IOException {
+        PrintStream printOut = new PrintStream(instructionSocket.getOutputStream());
+
+        // schedule removals
         for (File subDir : Objects.requireNonNull(directory.listFiles(File::isDirectory))) {
-            scheduleRemoveDirectory(subDir);
+            scheduleRemoveDirectory(subDir, instructionSocket);
         }
 
         // End Instruction Execution
@@ -260,12 +303,142 @@ public class InstructionReceiver {
                 (process) -> {
                     // discard this Socket
                     try {
-                        new PrintStream(instructionSocket.getOutputStream()).println("[SERVER] Deletion Complete.");
+                        printOut.println("[SERVER] Deletion Complete.");
                         instructionSocket.close();
                     } catch (IOException e) {
                         throw new RuntimeException(e);
                     }
-                });
+                },
+                null
+        );
+    }
+
+    /**
+     * Schedule: Resample audios @src -> @dest, to 44100Hz mono.
+     *
+     * @param instructionSocket the Instruction Socket which this Schedule associated with.
+     * @src .\dataset_raw
+     * @dest .\dataset\44k
+     */
+    private static void scheduleResampleAudio(Socket instructionSocket) throws IOException {
+        PrintStream printOut = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
+
+        String[] command = {
+                PYTHON_EXE.getAbsolutePath(),
+                RESAMPLER_PY.getAbsolutePath(),
+        };
+
+        EXECUTION_AGENT.executeLater(
+                command,
+                SO_VITS_SVC_DIR,
+                (process) -> {
+                    if (process.exitValue() == 0) {
+                        System.out.println("[SERVER] Audio Resampled -> 44100Hz mono.");
+                        printOut.println("[SERVER] Resampled to 44100Hz mono.");
+                    } else {
+                        String errorMessage = buildTerminationErrorMessage(process, RESAMPLER_PY);
+                        System.err.println(errorMessage);
+                        printOut.println("[ERROR] Failed to Resample Audio.");
+                    }
+                },
+                printOut
+        );
+    }
+
+    /**
+     * Schedule: Split the dataset into training and validation sets, and generate configuration files.
+     * @param encoder the chosen speech encoder.
+     * @param loudnessEmbedding if loudness embedding is enabled.
+     * @param instructionSocket the Instruction Socket which this Schedule associated with.
+     */
+    private static void scheduleSplitDatasetAndGenerateConfig(
+            String encoder,
+            boolean loudnessEmbedding,
+            Socket instructionSocket
+    ) throws IOException {
+
+        PrintStream printOut = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
+
+        List<String> command = new ArrayList<>();
+        command.add(PYTHON_EXE.getAbsolutePath());
+        command.add(FLIST_CONFIGER_PY.getAbsolutePath());
+        command.add("--speech_encoder");
+        command.add(encoder);
+        if (loudnessEmbedding) {
+            command.add("--vol_aug");
+        }
+
+        EXECUTION_AGENT.executeLater(
+                command,
+                SO_VITS_SVC_DIR,
+                (process) -> {
+                    if (process.exitValue() == 0) {
+                        System.out.println("[SERVER] Training Set, Validation Set, Configuration Files Created.");
+                        printOut.println("[SERVER] Training Set, Validation Set, Configuration Files Created.");
+                    } else {
+                        String errorMessage = buildTerminationErrorMessage(process, FLIST_CONFIGER_PY);
+                        System.err.println(errorMessage);
+                        printOut.println("[ERROR] Failed to Split Dataset and Generate Config.");
+                    }
+                },
+                printOut
+        );
+    }
+
+    /**
+     * Schedule: Generate hubert and f0.
+     * @param f0Predictor the chosen f0Predictor.
+     * @param instructionSocket the Instruction Socket which this Schedule associated with.
+     * @feature Socket Terminal Operation:
+     *          close instructionSocket on exit of the execution.
+     */
+    private static void scheduleGenerateHubertAndF0(String f0Predictor, Socket instructionSocket) throws IOException {
+        PrintStream printOut = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
+
+        String[] command = {
+                PYTHON_EXE.getAbsolutePath(),
+                HUBERT_F0_GENERATOR_PY.getAbsolutePath(),
+                "--f0_predictor",
+                f0Predictor
+        };
+
+        EXECUTION_AGENT.executeLater(
+                command,
+                SO_VITS_SVC_DIR,
+                (process) -> {
+                    if (process.exitValue() == 0) {
+                        System.out.println("[SERVER] Hubert & F0 Predictor Generated.");
+                        printOut.println("[SERVER] Hubert & F0 Predictor Generated.");
+                    } else {
+                        String errorMessage = buildTerminationErrorMessage(process, HUBERT_F0_GENERATOR_PY);
+                        System.err.println(errorMessage);
+                        printOut.println("[ERROR] Failed to Generate Hubert and F0.");
+                    }
+
+                    printOut.println("[SERVER] Preprocessing Done.");
+
+                    try {
+                        instructionSocket.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                },
+                printOut
+        );
+    }
+
+    /**
+     * Build general termination error message about process's unexpected termination.
+     * @param process the Process which ran into a unexpected termination.
+     * @param executable the executable File associated with that process.
+     * @return termination error message
+     */
+    private static String buildTerminationErrorMessage(Process process, File executable) {
+        String errorMessage = "[ERROR] \"" +
+                executable.getName() +
+                "\" terminated unexpectedly, exit code: " +
+                process.exitValue();
+        return errorMessage;
     }
 
 }

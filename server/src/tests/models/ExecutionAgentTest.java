@@ -29,8 +29,8 @@ class ExecutionAgentTest {
     void executeLaterScheduleTest() {
         String[] command = {"help"};
 
-        Assertions.assertTrue(executionAgent.executeLater(Arrays.stream(command).toList(), null, null));
-        Assertions.assertTrue(executionAgent.executeLater(command, new File("."), null));
+        Assertions.assertTrue(executionAgent.executeLater(Arrays.stream(command).toList(), null, null, System.out));
+        Assertions.assertTrue(executionAgent.executeLater(command, new File("."), null, System.out));
     }
 
 
@@ -43,8 +43,8 @@ class ExecutionAgentTest {
         AtomicBoolean valid1 = new AtomicBoolean(false);
         AtomicBoolean valid2 = new AtomicBoolean(false);
 
-        executionAgent.executeLater(command, null, (p) -> valid1.set(true));
-        executionAgent.executeLater(command, null, (p) -> valid2.set(true));
+        executionAgent.executeLater(command, null, (p) -> valid1.set(true), System.out);
+        executionAgent.executeLater(command, null, (p) -> valid2.set(true), System.out);
 
         // wait for no execution occur
         Thread.sleep(100);

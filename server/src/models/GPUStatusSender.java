@@ -14,12 +14,12 @@ import static server.Server.CHARSET_DEFAULT;
  *
  * @responsibility Send GPU Status to Client
  * @feature One Refresh per Socket connection:
- * when the GPU Status is transferred, the corresponded Socket must be closed & discarded.
+ *          when the GPU Status is transferred, the corresponded Socket must be closed & discarded.
+ * @design UTILITY
  */
 public class GPUStatusSender {
 
     private static final int GPU_STATUS_SERVER_PORT = 3687;
-    private static final long REFRESH_INTERVAL = 1000;
     private static final long CONNECT_RETRY_INTERVAL = 1000;
 
     private static Thread workingTask;
@@ -61,17 +61,7 @@ public class GPUStatusSender {
             in.close();
             outputStream.flush();
 
-            // Refresh Interval
-            Thread.sleep(REFRESH_INTERVAL);
-
         } catch (IOException e) {
-            try {
-                Thread.sleep(CONNECT_RETRY_INTERVAL);
-            } catch (InterruptedException ex) {
-                return;
-            }
-            return;
-        } catch (InterruptedException e) {
             return;
         }
     }
