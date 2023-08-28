@@ -6,6 +6,7 @@ import org.json.JSONObject;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -27,6 +28,9 @@ public class InstructionReceiver {
     private static final File PREPROCESS_OUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\dataset\\44k");
     private static final File INFERENCE_INPUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\raw");
     private static final File TRAINING_LOG_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\logs\\44k");
+    private static final File TRAINING_CONFIG = new File(SO_VITS_SVC_DIR + "\\configs\\config.json");
+    private static final File TRAINING_CONFIG_LOG = new File(TRAINING_LOG_DIR_DEFAULT + "\\config.json");
+    private static final int JSON_STR_INDENT_FACTOR = 2;
     private static final String[] AUDIO_FILE_EXTENSIONS_ACCEPTED = {"wav"};
     private static final String AUDIO_FILE_EXTENSIONS_DESCRIPTION = "Wave File(s)(*.wav)";
     private static final ExecutionAgent EXECUTION_AGENT = ExecutionAgent.getExecutionAgent();
@@ -215,16 +219,51 @@ public class InstructionReceiver {
                     scheduleGenerateHubertAndF0(f0Predictor, instructionSocket);
                 }
                 case TRAIN -> {
+                    // Restore train configJSONObject = instructionJSONObject (with additional "gpu_id" entry)
+                    instructionJSONObject.remove("INSTRUCTION");
+                    int gpuId = (int) instructionJSONObject.remove("gpu_id");
 
+                    // Write config JSON to TRAINING_CONFIG
+                    try (FileWriter configJsonWriter = new FileWriter(TRAINING_CONFIG)) {
+                        configJsonWriter.write(instructionJSONObject.toString(JSON_STR_INDENT_FACTOR));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+
+                    // if resume training
+                    if (TRAINING_CONFIG_LOG.exists()) {
+                    }
+
+                    // schedule
+                    scheduleTraining(gpuId, instructionSocket);
                 }
                 case INFER -> {
 
                 }
                 case ABORT -> {
-                    EXECUTION_AGENT.killCurrentProcess();
+                    EXECUTION_AGENT.cancelAllTasks();
+                }
+                case GET -> {
+                    // determine which config to get
+                    String configToGet = instructionJSONObject.getString("config");
+                    switch (InstructionType.valueOf(configToGet.toUpperCase())) {
+                        case TRAIN -> {
+                            String configJSONString = getConfigJsonObject().toString();
+                            printOut.println(configJSONString);
+
+                            System.out.println("[SERVER] Sent Train Config to: " +
+                                    instructionSocket.getInetAddress() + ':' + instructionSocket.getPort());
+                        }
+                        default -> {
+                            instructionSocket.close();
+                            throw new IllegalArgumentException("configToGet is Invalid");
+                        }
+                    }
+                    // socket normal closure
+                    instructionSocket.close();
                 }
                 default -> {
-                    throw new IllegalArgumentException("InstructionType(key:\"INSTRUCTION\") is not supported");
+                    throw new IllegalArgumentException("INSTRUCTION: \"" + instructionType + "\" is not supported");
                 }
             }
             // execute ASAP
@@ -425,6 +464,75 @@ public class InstructionReceiver {
                 },
                 printOut
         );
+    }
+
+    /**
+     * Schedule: Training with config.json
+     * @param gpuId the chosen GPU ID.
+     * @param instructionSocket the Instruction Socket which this Schedule associated with.
+     * @feature Socket Terminal Operation:
+     *          close instructionSocket on exit of the execution.
+     */
+    private static void scheduleTraining(int gpuId, Socket instructionSocket) throws IOException {
+        PrintStream printOut = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
+
+        String[] command = {
+                "cmd.exe",
+                "/c",
+                "set",
+                "CUDA_VISIBLE_DEVICES=" + gpuId,
+                "&&",
+                PYTHON_EXE.getAbsolutePath(),
+                TRAIN_PY.getAbsolutePath(),
+                "-c",
+                TRAINING_CONFIG.getAbsolutePath(),
+                "-m",
+                "44k"
+        };
+
+        EXECUTION_AGENT.executeLater(
+                command,
+                SO_VITS_SVC_DIR,
+                (process) -> {
+                    if (process.exitValue() == 0) {
+                        printOut.println("[SERVER] Training Complete.");
+                    } else {
+                        String errorMessage = "[WARNING] \"" +
+                                TRAIN_PY.getName() +
+                                "\" interrupted, exit code: " +
+                                process.exitValue();
+                        System.err.println(errorMessage);
+                        printOut.println("[WARNING] \"" +
+                                TRAIN_PY.getName() +
+                                "\" interrupted."
+                        );
+
+                        try {
+                            instructionSocket.close();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+                },
+                printOut
+        );
+    }
+
+    /**
+     * Get Training Config JSONObject.
+     *
+     * @return Config JSONObject from TRAINING_CONFIG_LOG if it exists, otherwise from TRAINING_CONFIG.
+     */
+    private static JSONObject getConfigJsonObject() {
+        File loadSource = TRAINING_CONFIG_LOG.exists() ? TRAINING_CONFIG_LOG : TRAINING_CONFIG;
+
+        // Load JSON String from loadSource
+        try (BufferedReader in = Files.newBufferedReader(loadSource.toPath())) {
+            // Parse JSON String to JSONObject
+            return new JSONObject(in.lines().reduce("", String::concat));
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     /**

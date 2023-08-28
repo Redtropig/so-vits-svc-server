@@ -45,10 +45,11 @@ public class ExecutionAgent {
     }
 
     /**
-     * Kill current Process & its sub Processes.
+     * Cancel all pending & running tasks.
      */
-    public synchronized void killCurrentProcess() {
+    public void cancelAllTasks() {
         if (currentProcess != null) {
+            taskQueue.clear();
             currentProcess.descendants().forEach(ProcessHandle::destroy);
             currentProcess.destroy();
         }

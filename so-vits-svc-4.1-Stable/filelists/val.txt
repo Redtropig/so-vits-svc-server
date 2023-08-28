@@ -1,2 +1,2 @@
-./dataset/44k/CG/QH_ChangGe1_2.wav
-./dataset/44k/CG/QH_ChangGe1_7.wav
+./dataset/44k/CGG/QH_ChangGe1_0.wav
+./dataset/44k/CGG/QH_ChangGe1_1.wav

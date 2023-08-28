@@ -31,7 +31,7 @@ public class Server {
             switch (command) {
                 case "quit" -> {
                     System.out.println("[SERVER] Server Terminating...");
-                    EXECUTION_AGENT.killCurrentProcess();
+                    EXECUTION_AGENT.cancelAllTasks();
                     System.exit(0);
                 }
                 case "help" -> {
