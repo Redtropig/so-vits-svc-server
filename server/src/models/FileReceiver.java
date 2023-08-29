@@ -4,6 +4,8 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import static models.ExecutionAgent.SO_VITS_SVC_DIR;
+
 /**
  * File Receiver (Util Class)
  * @responsibility Listening for File transfer.
@@ -16,7 +18,7 @@ public class FileReceiver {
     private static final int FILE_TRANSFER_FRAGMENT_SIZE = 1024; // bytes
     private static final int FILE_TRANSFER_SERVER_PORT = 23333;
     protected static final File FOLDER_TO_SLICE = new File(".\\.tmp\\toSlice");
-    protected static final File FOLDER_TO_INFER = new File(".\\.tmp\\toInfer");
+    protected static final File FOLDER_TO_INFER = new File(SO_VITS_SVC_DIR + "\\raw");
 
     private static Thread workingTask;
 

@@ -62,7 +62,7 @@
     "speaker_embedding": false,
     "use_transformer_flow": false,
     "n_heads": 2,
-    "n_speakers": 1,
+    "n_speakers": 2,
     "upsample_initial_channel": 512,
     "p_dropout": 0.1,
     "resblock_kernel_sizes": [
@@ -75,21 +75,21 @@
     "n_layers": 6
   },
   "train": {
-    "vol_aug": false,
+    "vol_aug": true,
     "batch_size": 4,
     "init_lr_ratio": 1,
     "seed": 1234,
     "c_mel": 45,
     "eps": 1E-9,
     "keep_ckpts": 1,
-    "log_interval": 50,
-    "fp16_run": false,
+    "log_interval": 10,
+    "fp16_run": true,
     "warmup_epochs": 0,
     "all_in_mem": true,
     "lr_decay": 0.999875,
     "segment_size": 10240,
     "c_kl": 1,
-    "eval_interval": 200,
+    "eval_interval": 10,
     "port": "8001",
     "betas": [
       0.8,
@@ -101,5 +101,8 @@
     "use_sr": true,
     "max_speclen": 512
   },
-  "spk": {"CGG": 0}
+  "spk": {
+    "CG": 0,
+    "QX": 1
+  }
 }

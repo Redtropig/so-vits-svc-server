@@ -8,10 +8,12 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
 import static models.ExecutionAgent.*;
+import static models.FileReceiver.FOLDER_TO_INFER;
 import static models.FileReceiver.FOLDER_TO_SLICE;
 import static server.Server.CHARSET_DEFAULT;
 
@@ -23,16 +25,22 @@ import static server.Server.CHARSET_DEFAULT;
  * @design UTILITY
  */
 public class InstructionReceiver {
+
     private static final int INSTRUCTION_TRANSFER_FRAGMENT_SIZE = 1024; // bytes
+    private static final int PITCH_SHIFT_INFER_DEFAULT = 0;
+    private static final int JSON_STR_INDENT_FACTOR = 2;
+    private static final float CLIP_INFER_DEFAULT = 0;
     private static final File SLICING_OUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\dataset_raw");
     private static final File PREPROCESS_OUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\dataset\\44k");
     private static final File INFERENCE_INPUT_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\raw");
     private static final File TRAINING_LOG_DIR_DEFAULT = new File(SO_VITS_SVC_DIR + "\\logs\\44k");
     private static final File TRAINING_CONFIG = new File(SO_VITS_SVC_DIR + "\\configs\\config.json");
     private static final File TRAINING_CONFIG_LOG = new File(TRAINING_LOG_DIR_DEFAULT + "\\config.json");
-    private static final int JSON_STR_INDENT_FACTOR = 2;
-    private static final String[] AUDIO_FILE_EXTENSIONS_ACCEPTED = {"wav"};
+    private static final File RESULTS_DIR = new File(".\\results");
+    private static final String REGEX_TRAINED_MODEL_NAME = "^G_[1-9]\\d*\\.pth$";
     private static final String AUDIO_FILE_EXTENSIONS_DESCRIPTION = "Wave File(s)(*.wav)";
+    private static final String AUDIO_FILE_OUT_FORMAT = "wav";
+    private static final String[] AUDIO_FILE_EXTENSIONS_ACCEPTED = {"wav"};
     private static final ExecutionAgent EXECUTION_AGENT = ExecutionAgent.getExecutionAgent();
 
     private static int port;
@@ -74,6 +82,7 @@ public class InstructionReceiver {
         try (ServerSocket serverSocket = new ServerSocket(InstructionReceiver.port)) {
             Socket finalInstructionSocket = instructionSocket = serverSocket.accept(); // Typically closed in <afterExecution>
             DataInputStream inputStream = new DataInputStream(instructionSocket.getInputStream());
+            DataOutputStream outputStream = new DataOutputStream(instructionSocket.getOutputStream());
             PrintStream printOut = new PrintStream(instructionSocket.getOutputStream(), true, CHARSET_DEFAULT);
 
             // Read Instruction JSONString
@@ -230,20 +239,114 @@ public class InstructionReceiver {
                         throw new RuntimeException(e);
                     }
 
-                    // if resume training
-                    if (TRAINING_CONFIG_LOG.exists()) {
-                    }
-
                     // schedule
                     scheduleTraining(gpuId, instructionSocket);
                 }
                 case INFER -> {
+                    // Get Inference Input Files
+                    File[] vocalAudioFiles = FOLDER_TO_INFER.listFiles(new FileFilter() {
+                        @Override
+                        public boolean accept(File file) {
+                            return !file.isHidden(); // except hidden Files
+                        }
+                    });
 
+                    // Get JSON Objects
+                    JSONObject configJsonObject = getConfigJsonObject();
+                    JSONObject modelJsonObject = configJsonObject.getJSONObject("model");
+
+                    // Construct command
+                    List<String> command = new ArrayList<>();
+                    command.add("cmd.exe");
+                    command.add("/c");
+                    command.add("set");
+                    command.add("CUDA_VISIBLE_DEVICES=" + instructionJSONObject.getInt("gpu_id"));
+                    command.add("&&");
+                    command.add(PYTHON_EXE.getAbsolutePath());
+                    command.add(INFERENCE_PY.getAbsolutePath());
+
+                    command.add("--model_path");
+                    File[] trainedModels = TRAINING_LOG_DIR_DEFAULT.listFiles((dir, name) ->
+                            name.matches(REGEX_TRAINED_MODEL_NAME));
+                    assert trainedModels != null;
+                    // logs: no trained model
+                    if (trainedModels.length == 0) {
+                        printOut.println("[ERROR] Model not Trained.");
+                        throw new FileNotFoundException("No Model Trained in: \"" + TRAINING_LOG_DIR_DEFAULT + "\"");
+                    }
+                    assert trainedModels.length == 1;
+                    command.add(trainedModels[0].getAbsolutePath());
+
+                    command.add("--config_path");
+                    command.add(TRAINING_CONFIG_LOG.getAbsolutePath());
+
+                    command.add("--wav_format");
+                    command.add(AUDIO_FILE_OUT_FORMAT);
+
+                    command.add("--trans");
+                    command.add(String.valueOf(PITCH_SHIFT_INFER_DEFAULT));
+
+                    command.add("--spk_list");
+                    command.add(instructionJSONObject.getString("spk"));
+
+                    command.add("--clean_names");
+                    command.addAll(Arrays.stream(vocalAudioFiles).map(File::getName).toList());
+
+                    command.add("--f0_predictor");
+                    command.add(instructionJSONObject.getString("f0_predictor"));
+
+                    if (instructionJSONObject.getBoolean("nsf_hifigan")) {
+                        command.add("--enhance");
+                    }
+
+                    // whisper-ppg speech encoder need to set --clip to 25 and -lg to 1
+                    if ("whisper-ppg".equals(modelJsonObject.getString("speech_encoder"))) {
+                        command.add("--clip");
+                        command.add(String.valueOf(25));
+                        command.add("-lg");
+                        command.add(String.valueOf(1));
+                    } else {
+                        command.add("--clip");
+                        command.add(String.valueOf(CLIP_INFER_DEFAULT));
+                    }
+
+                    // Schedule inference task
+                    EXECUTION_AGENT.executeLater(
+                            command,
+                            SO_VITS_SVC_DIR,
+                            (process) -> {
+                                if (process.exitValue() == 0) {
+                                    System.out.println("[SERVER] Inference Complete.");
+                                    printOut.println("[SERVER] Inference Complete.");
+                                } else {
+                                    System.err.println("[WARNING] \"" +
+                                            INFERENCE_PY.getName() +
+                                            "\" interrupted, exit code: " +
+                                            process.exitValue()
+                                    );
+                                    printOut.println("[WARNING] \"" +
+                                            INFERENCE_PY.getName() +
+                                            "\" interrupted."
+                                    );
+                                }
+
+                                try {
+                                    finalInstructionSocket.close();
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+
+                                // delete all to-infer temp Files
+                                Arrays.stream(vocalAudioFiles).forEach(File::delete);
+                            },
+                            printOut
+                    );
                 }
                 case ABORT -> {
                     EXECUTION_AGENT.cancelAllTasks();
+                    instructionSocket.close(); // Close this Abort Socket
                 }
-                case GET -> {
+                case GET_CONF -> {
                     // determine which config to get
                     String configToGet = instructionJSONObject.getString("config");
                     switch (InstructionType.valueOf(configToGet.toUpperCase())) {
@@ -260,6 +363,45 @@ public class InstructionReceiver {
                         }
                     }
                     // socket normal closure
+                    instructionSocket.close();
+                }
+                case GET_RESULTS -> {
+                    // Get Result Files
+                    File[] resultFiles = RESULTS_DIR.listFiles(new FileFilter() {
+                        @Override
+                        public boolean accept(File file) {
+                            return !file.isHidden(); // except hidden Files
+                        }
+                    });
+
+                    // Send each File
+                    Arrays.stream(resultFiles).forEach(file -> {
+                        FileInputStream fileInStream = null;
+                        synchronized (outputStream) {
+                            try {
+                                fileInStream = new FileInputStream(file);
+
+                                outputStream.writeUTF(file.getName());
+                                outputStream.writeInt((int) file.length());
+                                outputStream.write(fileInStream.readAllBytes());
+                            } catch (IOException e) {
+                                System.err.println("[ERROR] Failed to Send File: \"" + file + "\" -> " +
+                                        finalInstructionSocket.getInetAddress() + ':' + finalInstructionSocket.getPort());
+                                throw new RuntimeException(e); // Abort Sending
+                            } finally {
+                                try {
+                                    fileInStream.close();
+                                } catch (IOException e) {} // Not to override the original Exception
+                            }
+
+                            System.out.println("[SERVER] Sent File: \"" + file + "\" -> " +
+                                    finalInstructionSocket.getInetAddress() + ':' + finalInstructionSocket.getPort());
+                        }
+
+                        // delete the result File which was just sent to Client (secured Delete after Sent)
+                        file.delete();
+                    });
+
                     instructionSocket.close();
                 }
                 default -> {
@@ -506,12 +648,12 @@ public class InstructionReceiver {
                                 TRAIN_PY.getName() +
                                 "\" interrupted."
                         );
+                    }
 
-                        try {
-                            instructionSocket.close();
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
+                    try {
+                        instructionSocket.close();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
                     }
                 },
                 printOut

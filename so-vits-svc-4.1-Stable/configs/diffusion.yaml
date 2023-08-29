@@ -24,12 +24,13 @@ model:
   n_chans: 512
   n_hidden: 256
   n_layers: 20
-  n_spk: 1
+  n_spk: 2
   timesteps: 1000
   type: Diffusion
   use_pitch_aug: true
 spk:
-  CGG: 0
+  CG: 0
+  QX: 1
 train:
   amp_dtype: fp32
   batch_size: 48
