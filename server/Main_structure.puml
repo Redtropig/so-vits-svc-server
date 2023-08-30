@@ -1,0 +1,246 @@
+@startuml
+
+/' diagram meta data start
+config=StructureConfiguration;
+{
+  "projectClassification": {
+    "searchMode": "OpenProject", // OpenProject, AllProjects
+    "includedProjects": "",
+    "pathEndKeywords": "*.impl",
+    "isClientPath": "",
+    "isClientName": "",
+    "isTestPath": "",
+    "isTestName": "",
+    "isMappingPath": "",
+    "isMappingName": "",
+    "isDataAccessPath": "",
+    "isDataAccessName": "",
+    "isDataStructurePath": "",
+    "isDataStructureName": "",
+    "isInterfaceStructuresPath": "",
+    "isInterfaceStructuresName": "",
+    "isEntryPointPath": "",
+    "isEntryPointName": "",
+    "treatFinalFieldsAsMandatory": false
+  },
+  "graphRestriction": {
+    "classPackageExcludeFilter": "",
+    "classPackageIncludeFilter": "",
+    "classNameExcludeFilter": "",
+    "classNameIncludeFilter": "",
+    "methodNameExcludeFilter": "",
+    "methodNameIncludeFilter": "",
+    "removeByInheritance": "", // inheritance/annotation based filtering is done in a second step
+    "removeByAnnotation": "",
+    "removeByClassPackage": "", // cleanup the graph after inheritance/annotation based filtering is done
+    "removeByClassName": "",
+    "cutMappings": false,
+    "cutEnum": false,
+    "cutTests": true,
+    "cutClient": false,
+    "cutDataAccess": false,
+    "cutInterfaceStructures": false,
+    "cutDataStructures": false,
+    "cutGetterAndSetter": false,
+    "cutConstructors": false
+  },
+  "graphTraversal": {
+    "forwardDepth": 6,
+    "backwardDepth": 6,
+    "classPackageExcludeFilter": "",
+    "classPackageIncludeFilter": "",
+    "classNameExcludeFilter": "",
+    "classNameIncludeFilter": "",
+    "methodNameExcludeFilter": "",
+    "methodNameIncludeFilter": "",
+    "hideMappings": false,
+    "hideDataStructures": false,
+    "hidePrivateMethods": false,
+    "hideInterfaceCalls": false, // indirection: implementation -> interface (is hidden) -> implementation
+    "onlyShowApplicationEntryPoints": false, // root node is included
+    "useMethodCallsForStructureDiagram": "BothDirections" // ForwardOnly, BothDirections, No
+  },
+  "details": {
+    "aggregation": "GroupByClass", // ByClass, GroupByClass, None
+    "showClassGenericTypes": true,
+    "showMethods": true,
+    "showMethodParameterNames": true,
+    "showMethodParameterTypes": true,
+    "showMethodReturnType": true,
+    "showPackageLevels": 6,
+    "showDetailedClassStructure": true
+  },
+  "rootClass": "Main",
+  "extensionCallbackMethod": "" // qualified.class.name#methodName - signature: public static String method(String)
+}
+diagram meta data end '/
+
+
+
+digraph g {
+    rankdir="TB"
+    splines=polyline
+    
+
+'nodes 
+subgraph cluster_1068799382 { 
+   	label=models
+	labeljust=l
+	fillcolor="#ececec"
+	style=filled
+   
+   ExecutionAgent1068799382[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(C)ExecutionAgent</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >-   currentProcess: Process [0..1]</TD></TR>
+<TR><TD ALIGN="LEFT" >-   taskQueue: Queue&lt;Runnable&gt; [0..*]</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >- ExecutionAgent()</TD></TR>
+<TR><TD ALIGN="LEFT" >+ cancelAllTasks()</TD></TR>
+<TR><TD ALIGN="LEFT" >- execute()</TD></TR>
+<TR><TD ALIGN="LEFT" >+ executeLater(command: List&lt;String&gt;, workDirectory: File, afterExecution: Consumer&lt;Process&gt;, printOut: PrintStream): boolean</TD></TR>
+<TR><TD ALIGN="LEFT" >+ executeLater(command: String[], workDirectory: File, afterExecution: Consumer&lt;Process&gt;, printOut: PrintStream): boolean</TD></TR>
+<TR><TD ALIGN="LEFT" >+ getExecutionAgent(): ExecutionAgent</TD></TR>
+<TR><TD ALIGN="LEFT" >+ invokeExecution()</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#FFFFFF"
+];
+
+FileReceiver1068799382[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(C)FileReceiver</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >- receive()</TD></TR>
+<TR><TD ALIGN="LEFT" >+ startFileReceiver()</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#FFFFFF"
+];
+
+FileUsage1068799382[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(E)FileUsage</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >+   TO_INFER: FileUsage [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   TO_SLICE: FileUsage [1]</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >+ valueOf(name: String): FileUsage</TD></TR>
+<TR><TD ALIGN="LEFT" >+ values(): FileUsage[]</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#DCFBD5"
+];
+
+GPUStatusSender1068799382[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(C)GPUStatusSender</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >- sendStatus()</TD></TR>
+<TR><TD ALIGN="LEFT" >+ startGPUStatusSender()</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#FFFFFF"
+];
+
+InstructionReceiver1068799382[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(C)InstructionReceiver</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >- buildTerminationErrorMessage(process: Process, executable: File): String</TD></TR>
+<TR><TD ALIGN="LEFT" >- getConfigJsonObject(): JSONObject</TD></TR>
+<TR><TD ALIGN="LEFT" >- receive()</TD></TR>
+<TR><TD ALIGN="LEFT" >- scheduleGenerateHubertAndF0(f0Predictor: String, instructionSocket: Socket)</TD></TR>
+<TR><TD ALIGN="LEFT" >- scheduleRemoveDirectory(directory: File, instructionSocket: Socket)</TD></TR>
+<TR><TD ALIGN="LEFT" >- scheduleRemoveSubDirectories(directory: File, instructionSocket: Socket)</TD></TR>
+<TR><TD ALIGN="LEFT" >- scheduleResampleAudio(instructionSocket: Socket)</TD></TR>
+<TR><TD ALIGN="LEFT" >- scheduleSplitDatasetAndGenerateConfig(encoder: String, loudnessEmbedding: boolean, instructionSocket: Socket)</TD></TR>
+<TR><TD ALIGN="LEFT" >- scheduleTraining(gpuId: int, instructionSocket: Socket)</TD></TR>
+<TR><TD ALIGN="LEFT" >+ startInstructionReceiver(port: int): int</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#FFFFFF"
+];
+
+InstructionType1068799382[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(E)InstructionType</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >+   ABORT: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   CLEAR: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   GET_CONF: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   GET_RESULTS: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   INFER: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   PREPROCESS: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   SLICE: InstructionType [1]</TD></TR>
+<TR><TD ALIGN="LEFT" >+   TRAIN: InstructionType [1]</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >+ valueOf(name: String): InstructionType</TD></TR>
+<TR><TD ALIGN="LEFT" >+ values(): InstructionType[]</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#DCFBD5"
+];
+} 
+
+subgraph cluster_2390489 { 
+   	label=Main
+	labeljust=l
+	fillcolor="#ececec"
+	style=filled
+   
+   Main2390489[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(C)Main</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >+ main(args: String[])</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#FFFFFF"
+];
+} 
+
+subgraph cluster_905826493 { 
+   	label=server
+	labeljust=l
+	fillcolor="#ececec"
+	style=filled
+   
+   Server905826493[
+	label=<<TABLE BORDER="1" CELLBORDER="0" CELLPADDING="4" CELLSPACING="0">
+<TR><TD ALIGN="LEFT" >(C)Server</TD></TR>
+<HR/>
+<TR><TD ALIGN="LEFT" >+ startServer()</TD></TR>
+</TABLE>>
+	style=filled
+	margin=0
+	shape=plaintext
+	fillcolor="#FFFFFF"
+];
+} 
+
+'edges    
+FileReceiver1068799382 -> FileUsage1068799382[label="receive() -> valueOf()"];
+Main2390489 -> Server905826493[label="main() -> startServer()"];
+Server905826493 -> ExecutionAgent1068799382[label="startServer() -> cancelAllTasks()"];
+Server905826493 -> FileReceiver1068799382[label="startServer() -> startFileReceiver()"];
+Server905826493 -> GPUStatusSender1068799382[label="startServer() -> startGPUStatusSender()"];
+Server905826493 -> InstructionReceiver1068799382[label="startServer() -> startInstructionReceiver()"];
+    
+}
+@enduml

@@ -13,7 +13,10 @@ public class Server {
     public static final Charset CHARSET_DEFAULT = StandardCharsets.UTF_8;
     private static final ExecutionAgent EXECUTION_AGENT = ExecutionAgent.getExecutionAgent();
 
-    public Server() {
+    /**
+     * Server Entry Method.
+     */
+    public static void startServer() {
         Scanner in = new Scanner(System.in);
         System.out.println("set Service Port (1025~65535):");
 
@@ -45,6 +48,5 @@ public class Server {
             }
         }
         /* End Server Console Interactions */
-
     }
 }

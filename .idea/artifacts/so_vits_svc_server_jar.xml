@@ -1,0 +1,20 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="so-vits-svc-server:jar">
+    <output-path>$PROJECT_DIR$</output-path>
+    <root id="archive" name="so-vits-svc-server.jar">
+      <element id="directory" name="META-INF">
+        <element id="file-copy" path="$PROJECT_DIR$/server/out/META-INF/MANIFEST.MF" />
+      </element>
+      <element id="module-output" name="so-vits-svc-server" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/json-20230227.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/opentest4j-1.2.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/junit-jupiter-5.8.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/apiguardian-api-1.1.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/junit-jupiter-api-5.8.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/junit-jupiter-engine-5.8.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/junit-jupiter-params-5.8.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/junit-platform-engine-1.8.1.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$PROJECT_DIR$/server/lib/junit-platform-commons-1.8.1.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>
