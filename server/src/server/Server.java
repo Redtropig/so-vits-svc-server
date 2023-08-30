@@ -5,6 +5,8 @@ import models.FileReceiver;
 import models.GPUStatusSender;
 import models.InstructionReceiver;
 
+import java.io.IOException;
+import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Scanner;
@@ -14,20 +16,29 @@ public class Server {
     private static final ExecutionAgent EXECUTION_AGENT = ExecutionAgent.getExecutionAgent();
 
     /**
-     * Server Entry Method.
+     * Server Entry Point.
      */
     public static void startServer() {
-        Scanner in = new Scanner(System.in);
-        System.out.println("set Service Port (1025~65535):");
 
-        // Stand-By Listening
-        int actualPort = InstructionReceiver.startInstructionReceiver(in.nextInt());
+        /* Create Stand-By Listening */
         FileReceiver.startFileReceiver();
         GPUStatusSender.startGPUStatusSender();
 
-        System.out.println("[SERVER] Server started listening on port:" + actualPort);
+        // get an auto allocated port
+        int port;
+        try (ServerSocket probSocket = new ServerSocket(0)) {
+            port = probSocket.getLocalPort();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        // use auto allocated port to start Instruction Receiver
+        int actualPort = InstructionReceiver.startInstructionReceiver(port);
+
+        System.out.println("[SERVER] Server started on port: " + actualPort);
+        /* End Create Stand-By Listening */
 
         /* Server Console Interactions */
+        Scanner in = new Scanner(System.in);
         while (in.hasNext()) {
             String command = in.next();
 
@@ -44,6 +55,7 @@ public class Server {
                 }
                 default -> {
                     System.out.println("[!] Command not found.");
+                    in.nextLine(); // clear invalid command input line
                 }
             }
         }

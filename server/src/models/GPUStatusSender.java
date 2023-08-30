@@ -19,8 +19,7 @@ import static server.Server.CHARSET_DEFAULT;
  */
 public class GPUStatusSender {
 
-    private static final int GPU_STATUS_SERVER_PORT = 3687;
-    private static final long CONNECT_RETRY_INTERVAL = 1000;
+    private static final int GPU_STATUS_SERVER_PORT = 43687;
 
     private static Thread workingTask;
 

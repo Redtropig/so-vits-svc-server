@@ -16,7 +16,7 @@ import static models.ExecutionAgent.SO_VITS_SVC_DIR;
 public class FileReceiver {
 
     private static final int FILE_TRANSFER_FRAGMENT_SIZE = 1024; // bytes
-    private static final int FILE_TRANSFER_SERVER_PORT = 23333;
+    private static final int FILE_TRANSFER_SERVER_PORT = 43688;
     protected static final File FOLDER_TO_SLICE = new File(".\\.tmp\\toSlice");
     protected static final File FOLDER_TO_INFER = new File(SO_VITS_SVC_DIR + "\\raw");
 
@@ -66,6 +66,9 @@ public class FileReceiver {
                 default -> { // should never reach
                     destFile = null;
                 }
+            }
+            if (!destFile.getParentFile().exists() && !destFile.getParentFile().mkdirs()) {
+                throw new IOException("Failed to create dir: \"" + destFile.getParentFile() + "\"");
             }
             destFile.deleteOnExit(); // register auto-deletion
 
