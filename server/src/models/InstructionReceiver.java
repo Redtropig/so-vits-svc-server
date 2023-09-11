@@ -93,7 +93,7 @@ public class InstructionReceiver {
             InstructionType instructionType = InstructionType.valueOf(instructionJSONObject.getString("INSTRUCTION"));
 
             System.out.println("[SERVER] " + instructionType +
-                    " Instruction from: " + instructionSocket.getInetAddress() + ':' + instructionSocket.getPort());
+                    " Instruction from: [" + instructionSocket.getInetAddress() + "]:" + instructionSocket.getPort());
 
             // Parse Instruction & Schedule Execution Tasks
             switch (instructionType) {
@@ -354,8 +354,8 @@ public class InstructionReceiver {
                             String configJSONString = getConfigJsonObject().toString();
                             printOut.println(configJSONString);
 
-                            System.out.println("[SERVER] Sent Train Config to: " +
-                                    instructionSocket.getInetAddress() + ':' + instructionSocket.getPort());
+                            System.out.println("[SERVER] Sent Train Config to: [" +
+                                    instructionSocket.getInetAddress() + "]:" + instructionSocket.getPort());
                         }
                         default -> {
                             instructionSocket.close();
@@ -385,8 +385,8 @@ public class InstructionReceiver {
                                 outputStream.writeInt((int) file.length());
                                 outputStream.write(fileInStream.readAllBytes());
                             } catch (IOException e) {
-                                System.err.println("[ERROR] Failed to Send File: \"" + file + "\" -> " +
-                                        finalInstructionSocket.getInetAddress() + ':' + finalInstructionSocket.getPort());
+                                System.err.println("[ERROR] Failed to Send File: \"" + file + "\" -> [" +
+                                        finalInstructionSocket.getInetAddress() + "]:" + finalInstructionSocket.getPort());
                                 throw new RuntimeException(e); // Abort Sending
                             } finally {
                                 try {
@@ -394,8 +394,8 @@ public class InstructionReceiver {
                                 } catch (IOException e) {} // Not to override the original Exception
                             }
 
-                            System.out.println("[SERVER] Sent File: \"" + file + "\" -> " +
-                                    finalInstructionSocket.getInetAddress() + ':' + finalInstructionSocket.getPort());
+                            System.out.println("[SERVER] Sent File: \"" + file + "\" -> [" +
+                                    finalInstructionSocket.getInetAddress() + "]:" + finalInstructionSocket.getPort());
                         }
 
                         // delete the result File which was just sent to Client (secured Delete after Sent)
